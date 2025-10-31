@@ -1,0 +1,95 @@
+name: Deploy Lucky Puppy Bot to Fly.io
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Pull repository code
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      # Step 2: Set up Docker Buildx
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      # Step 3: Log in to Fly.io Registry (for Docker push)
+      - name: Log in to Fly.io Registry
+        uses: docker/login-action@v2
+        with:
+          registry: registry.fly.io
+          username: x
+          password: ${{ secrets.FLY_API_TOKEN }}
+
+      # Step 4: Build and push Docker image to Fly.io registry
+      - name: Build and Push Docker Image
+        run: |
+          docker build -t registry.fly.io/lucky-puppy-bot:latest .
+          docker push registry.fly.io/lucky-puppy-bot:latest
+
+      # Step 5: Install flyctl CLI
+      - name: Install flyctl CLI
+        run: |
+          curl -L https://fly.io/install.sh | sh
+          echo "$HOME/.fly/bin" >> $GITHUB_PATH
+
+      # Step 6: Debug token length (should NOT be 0)
+      - name: Debug Fly token length
+        run: |
+          if [ -z "$FLY_API_TOKEN" ]; then
+            echo "❌ ERROR: FLY_API_TOKEN is not available in this workflow."
+            exit 1
+          else
+            echo "✅ Token length is ${#FLY_API_TOKEN}"
+          fi
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+      # Step 7: Verify Fly.io authentication using token
+      - name: Verify Fly.io Token
+        run: flyctl auth whoami
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+      # Step 8: Sync secrets to Fly.io app
+      - name: Sync Secrets to Fly.io
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+          TELEGRAM_API_TOKEN: ${{ secrets.TELEGRAM_API_TOKEN }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          NEWS_API_KEY: ${{ secrets.NEWS_API_KEY }}
+          ADMIN_USER_ID: ${{ secrets.ADMIN_USER_ID }}
+          TARGET_CHAT_ID: ${{ secrets.TARGET_CHAT_ID }}
+        run: |
+          fly secrets set TELEGRAM_API_TOKEN="$TELEGRAM_API_TOKEN" --app lucky-puppy-bot
+          fly secrets set OPENROUTER_API_KEY="$OPENROUTER_API_KEY" --app lucky-puppy-bot
+          fly secrets set NEWS_API_KEY="$NEWS_API_KEY" --app lucky-puppy-bot
+          fly secrets set ADMIN_USER_ID="$ADMIN_USER_ID" --app lucky-puppy-bot
+          fly secrets set TARGET_CHAT_ID="$TARGET_CHAT_ID" --app lucky-puppy-bot
+
+      # Step 9: Deploy or update Fly Machine
+      - name: Deploy Fly Machine
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          machine_id=$(fly machines list -a lucky-puppy-bot --json | jq -r '.[0].id // empty')
+          if [ -z "$machine_id" ]; then
+            echo "No machine found. Launching new machine..."
+            fly machines run registry.fly.io/lucky-puppy-bot:latest \
+              --yes \
+              --app lucky-puppy-bot \
+              --region syd \
+              --name puppy-machine
+          else
+            echo "Machine found: $machine_id. Updating machine..."
+            fly machines update "$machine_id" \
+              --yes \
+              --app lucky-puppy-bot \
+              --image registry.fly.io/lucky-puppy-bot:latest
+          fi

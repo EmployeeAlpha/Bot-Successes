@@ -1,0 +1,25 @@
+# fly.toml — Lucky Puppy Bot (worker / polling)
+app = "lucky-puppy-bot"
+primary_region = "syd"
+kill_signal = "SIGINT"
+kill_timeout = 5
+
+# Run the bot process (matches our Dockerfile and /app workdir)
+[processes]
+app = "python -u /app/bot.py"
+
+[mounts]
+  source = "data"
+  destination = "/data"
+
+# IMPORTANT:
+# - There is NO [[services]] block here because we're a worker (no HTTP).
+# - If you later switch to Telegram webhooks, we'll add [[services]] and a /health route.
+
+# OPTIONAL (add later only AFTER creating a volume):
+# [mounts]
+#   source = "data"
+#   destination = "/data"
+#
+# You'll first need to create it with:
+# flyctl volumes create data --app lucky-puppy-bot --region syd --size 1

@@ -1,0 +1,4 @@
+python-telegram-bot[job-queue]==20.8
+loguru>=0.7
+httpx>=0.23.0
+nest_asyncio>=1.5.6

@@ -1,0 +1,28 @@
+name: "Fly - Create Volume (one-time)"
+
+on:
+  workflow_dispatch:
+
+jobs:
+  create-volume:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Flyctl
+        uses: superfly/flyctl-actions/setup-flyctl@v1
+
+      - name: Create "data" volume in syd
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          APP="lucky-puppy-bot"
+          REGION="syd"
+          flyctl version
+          flyctl auth whoami
+          flyctl status --app "$APP"
+          if flyctl volumes list --app "$APP" | awk '{print $1}' | grep -qx "data"; then
+            echo "Volume 'data' already exists ✅"
+          else
+            flyctl volumes create data --app "$APP" --region "$REGION" --size 1 --yes
+            echo "Volume 'data' created ✅"
+          fi

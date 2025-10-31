@@ -1,0 +1,30 @@
+# secrets
+.env
+.env.*
+*.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+.envrc
+
+# logs & runtime data
+logs/
+data/
+data/**
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Node.js
+node_modules/
+npm-debug.log*
+
+# Ignore compiled Docker junk if generated
+docker-compose.override.yml

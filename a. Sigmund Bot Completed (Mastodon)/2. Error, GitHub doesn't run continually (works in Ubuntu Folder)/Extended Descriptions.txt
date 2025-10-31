@@ -1,0 +1,299 @@
+requirements.txt — Dependency List for SigmundBOT Mastodon Personality Bot
+This file lists all the external Python libraries required for the SigmundBOT to function correctly. When deploying the bot or setting it up locally, these dependencies will be installed automatically using pip. Ensuring these packages are installed guarantees that the bot can authenticate with Mastodon and Google APIs, process environment variables, and interact with Google Sheets for logging user interactions.
+
+Packages included:
+
+mastodon.py: The core library that provides easy access to the Mastodon API, enabling the bot to read mentions, post statuses, and interact with users on Mastodon.
+
+python-dotenv: Loads environment variables from a .env file, keeping sensitive tokens and credentials out of the codebase for security and configurability.
+
+gspread: A Google Sheets API client that allows the bot to read and write data to Google Sheets, used here for logging interactions and storing questionnaire results.
+
+google-auth, google-auth-oauthlib, google-auth-httplib2, oauth2client: These libraries handle secure OAuth2 authentication flows required to access Google APIs, ensuring the bot can safely communicate with Google Sheets using the service account credentials.
+
+requests: A widely used HTTP library that supports making web requests; used internally by several of the above packages to interact with web APIs.
+
+This setup ensures your bot has the necessary tools to operate seamlessly, securely, and with Google Sheets integration for data persistence.
+
+*******************************************************************************************************************************************************************************************************************************************************************************
+Extended Description of sigmundbot.py
+The sigmundbot.py script is the core of SigmundBOT, a Mastodon personality chatbot designed to interact with users on the Mastodon social network. This bot offers personality and psychological test recommendations through an engaging, conversational interface. It also logs user interactions into a Google Sheet for later review or analysis.
+
+Key Features
+User-Friendly Interaction:
+
+The bot greets new users with a friendly welcome message that offers a menu of personality and psychological tests.
+
+Users interact with the bot by replying with the number corresponding to their test choice (1 to 4).
+
+If a user sends an unrecognized message, the bot politely asks them to respond with a valid option.
+
+Personality Test Links:
+
+The bot supports four popular psychological tests:
+
+Big Five Personality Test (IPIP-BFFM)
+
+MBTI Personality Type Test (16Personalities)
+
+Stoicism Level Test (IDR Labs)
+
+HEXACO Personality Test
+
+When a user selects a test number, the bot replies with a direct link to that test.
+
+Mention Monitoring and Polling:
+
+The bot continuously polls Mastodon notifications to detect new mentions.
+
+When mentioned, it processes the incoming message, determines the appropriate response, and posts replies publicly as a threaded conversation.
+
+Interaction Logging:
+
+Every interaction (user input and bot response) is logged into a Google Sheet.
+
+This enables tracking user engagement and helps maintain a record of conversations for further analysis or improvement.
+
+Google Sheets API credentials are securely stored and accessed via environment variables.
+
+Environment-Driven Configuration:
+
+Sensitive information such as Mastodon API tokens, Mastodon server URL, Google Sheet ID, and Google API credentials are loaded securely from a .env file.
+
+This keeps secrets out of the codebase and supports secure deployment and version control.
+
+Robustness and Error Handling:
+
+The bot uses exception handling around the polling loop to ensure it can recover gracefully from network errors or API issues.
+
+It waits and retries on failure, maintaining continuous operation.
+
+Technical Components
+Mastodon API Client (mastodon.py):
+Handles authentication and communication with Mastodon's REST API for fetching notifications and posting statuses.
+
+Google Sheets API via gspread:
+Authenticates using a Google service account JSON and appends new rows to a specified spreadsheet for logging.
+
+HTML Content Cleaning:
+User messages received from Mastodon often contain HTML tags; these are stripped using regex to process clean, plain-text inputs.
+
+User State Management:
+Maintains an in-memory set of users who have already been greeted during the current runtime, avoiding repeated welcome messages.
+
+Workflow Summary
+Startup:
+Load environment variables, authenticate Mastodon and Google Sheets clients.
+
+Polling Loop:
+Every 60 seconds, fetch new notifications from Mastodon since the last checked ID.
+
+Notification Processing:
+For each mention:
+
+Extract the user's message and username.
+
+Clean the message text.
+
+If the message is a valid test selection (1-4), reply with the corresponding test URL.
+
+If the user is new, send the greeting menu.
+
+If the message is invalid and the user was previously greeted, prompt to reply with a valid number.
+
+Logging:
+Every user input and bot response is appended as a new row to the Google Sheet, timestamped for reference.
+
+Error Handling:
+If an exception occurs during polling or processing, the bot waits and retries, preventing crashes.
+
+Deployment Notes
+Dependencies:
+Requires Python packages: mastodon.py, gspread, google-auth, python-dotenv.
+
+Environment Setup:
+Must have .env file with correct Mastodon and Google Sheets credentials.
+
+Long Running Process:
+Designed to run indefinitely as a background service or worker, ideally hosted on a server or cloud platform with stable uptime.
+
+This design ensures that SigmundBOT is interactive, responsive, and maintainable, while keeping sensitive data secure and user engagement well documented.
+
+If you'd like, I can also draft a detailed explanation for your deployment pipeline or Google Sheets integration!
+
+*******************************************************************************************************************************************************************************************************************************************************************************
+About SigmundBOT
+SigmundBOT is a friendly and interactive personality bot designed to run on the Mastodon social platform. Its main purpose is to engage with users by offering popular psychometric tests that help individuals explore their personality traits and self-awareness. SigmundBOT can be followed or mentioned by Mastodon users, and it will respond with a menu of tests to choose from. Based on the user’s input, the bot replies with relevant links to online versions of scientifically validated personality assessments such as the Big Five, MBTI, Stoicism Level Test, and HEXACO Personality Test.
+
+Why SigmundBOT?
+Personality tests have become popular tools for self-discovery, career planning, and personal growth. However, accessing and navigating these tests can sometimes be cumbersome. SigmundBOT simplifies this process by delivering a concise, conversational interface within Mastodon, a decentralized and privacy-focused social network. It helps users quickly find reputable tests without leaving their social media environment.
+
+Core Features
+Interactive Menu: When a user mentions or follows SigmundBOT, it greets them and presents a clear, numbered menu of available tests.
+
+Flexible Responses: Users can reply with a number to select a test, and SigmundBOT responds with the appropriate test link.
+
+Error Handling: If the bot receives unrecognized input, it politely prompts the user to choose from the menu options again.
+
+Logging & Analytics: User interactions and results can optionally be logged to a Google Sheet for further analysis or record-keeping.
+
+Deployment Ready: SigmundBOT is easy to deploy on various platforms, including GitHub Actions, Render, Railway, and Replit.
+
+Open Source: The codebase is fully open, enabling users to customize, extend, or integrate the bot as needed.
+
+How It Works
+SigmundBOT continuously polls for mentions on Mastodon and checks if users interact with it. When a new mention arrives, it parses the content, strips out any HTML formatting, and processes the user’s input. If the input matches one of the predefined options (numbers 1 through 4), it replies with a direct link to that personality test. If it’s a new user or an unrecognized message, the bot sends the welcome menu again to guide the interaction.
+
+Security and Privacy
+SigmundBOT respects user privacy and does not store sensitive information beyond what is necessary for its functioning. API tokens and credentials are stored securely in environment variables and never committed to public repositories. The bot is designed for transparency and openness, aligning with Mastodon's principles of decentralization and user control.
+
+*******************************************************************************************************************************************************************************************************************************************************************************
+About stoicism_test.py
+The stoicism_test.py module is a dedicated script designed to facilitate the Stoicism Level Test within the SigmundBOT project. It serves as the logic handler for administering and evaluating a questionnaire based on Stoic philosophy principles, helping users gauge their understanding and practice of Stoicism.
+
+Purpose
+Stoicism is an ancient philosophy focused on personal virtue, resilience, and rational control over emotions. This test measures how closely a person’s attitudes and behaviors align with Stoic values such as wisdom, courage, justice, and temperance. By integrating this test, SigmundBOT provides users with a meaningful way to reflect on their mental and emotional habits through the lens of Stoic teachings.
+
+Core Functionality
+Questionnaire Handling: The script presents a series of Stoicism-related questions or statements that users respond to, typically on a scale (e.g., agree-disagree).
+
+Scoring Logic: It processes the responses to compute a score representing the user’s alignment with Stoic philosophy.
+
+Result Interpretation: Based on the score, it categorizes the user’s Stoicism level, providing insights or recommendations for personal growth.
+
+Integration: The script is called by the main bot logic when a user selects the Stoicism Level Test option, either to present the test or to handle user input related to the test.
+
+Extensibility: The module is designed for easy updates, allowing new questions or scoring adjustments as Stoicism research evolves.
+
+How It Fits in SigmundBOT
+While the main bot handles interaction with Mastodon users and general conversation flow, stoicism_test.py encapsulates the specific test logic, making the codebase modular and maintainable. This separation allows:
+
+Cleaner main bot code focused on messaging and API calls.
+
+Independent testing and development of the Stoicism questionnaire.
+
+Potential reuse or standalone deployment of the Stoicism test in other projects.
+
+Potential Enhancements
+Adding more nuanced scoring to better differentiate between Stoic principles.
+
+Providing detailed feedback and resources for users to deepen their understanding.
+
+Incorporating natural language processing for free-text user responses.
+
+Extending the test to track progress over multiple interactions.
+
+*******************************************************************************************************************************************************************************************************************************************************************************
+About deploy.yml
+The deploy.yml file is a GitHub Actions workflow configuration that automates the deployment of the SigmundBOT Mastodon personality bot. It defines a set of instructions and environment settings that GitHub uses to build, test, and deploy the bot code whenever changes are pushed to the repository or triggered manually.
+
+Purpose
+Automation is key to modern software development and continuous deployment. This workflow enables you to reliably deploy your bot without manual intervention, ensuring the latest code changes are live and running on your chosen hosting platform. It also helps maintain consistency, reduces human error, and accelerates development cycles.
+
+Core Features
+Trigger Events: The workflow is configured to run on specific GitHub events such as push to the main branch or when manually triggered via the GitHub UI. This ensures deployments happen only when desired.
+
+Environment Setup: It sets up a Python environment with a specified version, installs all dependencies from requirements.txt, and prepares the runtime environment.
+
+Secret Management: Sensitive credentials like Mastodon API tokens and Google Sheets API credentials are securely loaded from GitHub Secrets or .env files without exposing them in the codebase.
+
+Execution: The bot script (sigmundbot.py) is executed as part of the workflow to start the service or deploy the latest code.
+
+Error Handling: The workflow will stop and report errors if any step fails, making troubleshooting straightforward.
+
+Extensibility: The configuration can be modified to add tests, linting, or deployment to other platforms as your project evolves.
+
+Workflow Breakdown
+Checkout Code: The workflow first pulls the latest version of your repository.
+
+Set up Python: It installs the specific Python version needed.
+
+Install Dependencies: All Python packages listed in requirements.txt are installed.
+
+Run Bot: The sigmundbot.py script is executed to launch the bot or trigger deployment steps.
+
+Cleanup and Reporting: On success or failure, the workflow logs results and optionally sends notifications.
+
+Benefits
+Consistency: Guarantees that the deployment process is the same every time.
+
+Speed: Reduces time spent on manual setup and deployment.
+
+Security: Keeps API keys and tokens safe by using encrypted secrets.
+
+Integration: Fits seamlessly with GitHub’s ecosystem, enabling collaborative development.
+
+Visibility: Provides logs and status in GitHub Actions tab for easy monitoring.
+
+How to Customize
+Change Python Version: Modify the Python version as per your bot’s requirements.
+
+Add Tests: Insert steps for automated tests before deployment.
+
+Extend Triggers: Add other GitHub events to trigger deployments, like pull requests.
+
+Deploy to Other Platforms: Add commands to deploy to services like Render, Railway, or Replit.
+
+Environment Variables: Add or modify environment variables as needed for your project.
+
+*******************************************************************************************************************************************************************************************************************************************************************************
+
+
+
+*******************************************************************************************************************************************************************************************************************************************************************************
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

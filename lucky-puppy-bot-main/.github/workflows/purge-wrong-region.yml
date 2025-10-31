@@ -1,0 +1,42 @@
+name: "Fly - Purge non-syd machines (one-time)"
+
+on:
+  workflow_dispatch:
+
+jobs:
+  purge:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Flyctl
+        uses: superfly/flyctl-actions/setup-flyctl@v1
+
+      - name: Remove machines not in syd
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          APP="lucky-puppy-bot"
+          KEEP_REGION="syd"
+
+          echo "==> Current machines (json)"
+          flyctl machines list --app "$APP" --json | tee machines.json || true
+
+          if command -v jq >/dev/null 2>&1; then
+            IDS=$(jq -r '.[] | select(.region != "'"$KEEP_REGION"'") | .id' machines.json)
+          else
+            IDS=$(flyctl machines list --app "$APP" | awk 'NR>1 && $4!="'$KEEP_REGION'" {print $2}')
+          fi
+
+          if [ -z "$IDS" ]; then
+            echo "No machines outside $KEEP_REGION — nothing to remove."
+            exit 0
+          fi
+
+          for MID in $IDS; do
+            echo "Stopping $MID (non-$KEEP_REGION)..."
+            flyctl machines stop --app "$APP" "$MID" || true
+            echo "Removing $MID..."
+            flyctl machines remove --app "$APP" "$MID" --force
+          done
+
+          echo "✅ Purge complete."

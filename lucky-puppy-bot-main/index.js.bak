@@ -1,0 +1,202 @@
+import dotenv from "dotenv";
+dotenv.config();
+
+import TelegramBot from "node-telegram-bot-api";
+import fs from "fs";
+import path from "path";
+import fetch from "node-fetch"; // For API calls to Openrouter.io
+
+// === Constants & Paths ===
+const TELEGRAM_API_TOKEN = process.env.TELEGRAM_API_TOKEN;
+const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
+
+if (!TELEGRAM_API_TOKEN || !OPENROUTER_API_KEY) {
+  console.error("Missing TELEGRAM_API_TOKEN or OPENROUTER_API_KEY in .env!");
+  process.exit(1);
+}
+
+const LOGS_DIR = path.resolve("./logs");
+const USERS_FILE = path.join(LOGS_DIR, "users.json");
+const POSTED_ARTICLES_FILE = path.join(LOGS_DIR, "posted_articles.txt");
+const QUOTES_FILE = path.resolve("./quotes.txt");
+const USER_QUOTE_INDEX_FILE = path.join(LOGS_DIR, "user_quote_index.json");
+const GREETED_USERS_FILE = "./greeted_users.json";
+
+// === Create logs directory and files if missing ===
+if (!fs.existsSync(LOGS_DIR)) fs.mkdirSync(LOGS_DIR);
+if (!fs.existsSync(POSTED_ARTICLES_FILE)) fs.writeFileSync(POSTED_ARTICLES_FILE, "");
+if (!fs.existsSync(USERS_FILE)) fs.writeFileSync(USERS_FILE, "[]");
+if (!fs.existsSync(USER_QUOTE_INDEX_FILE)) fs.writeFileSync(USER_QUOTE_INDEX_FILE, "{}");
+if (!fs.existsSync(GREETED_USERS_FILE)) fs.writeFileSync(GREETED_USERS_FILE, "[]");
+
+// === Helpers ===
+function readLines(file) {
+  try {
+    return fs.readFileSync(file, "utf-8").split("\n").filter(line => line.trim());
+  } catch {
+    return [];
+  }
+}
+function appendLine(file, line) {
+  fs.appendFileSync(file, line + "\n");
+}
+
+// === Load & Save Users ===
+function loadUsers() {
+  try {
+    return new Set(JSON.parse(fs.readFileSync(USERS_FILE, "utf-8")));
+  } catch {
+    return new Set();
+  }
+}
+function saveUsers(users) {
+  fs.writeFileSync(USERS_FILE, JSON.stringify([...users]));
+}
+let users = loadUsers();
+
+// === Quote Management per User ===
+function loadUserQuoteIndices() {
+  try {
+    return JSON.parse(fs.readFileSync(USER_QUOTE_INDEX_FILE, "utf8"));
+  } catch {
+    return {};
+  }
+}
+function saveUserQuoteIndices(data) {
+  fs.writeFileSync(USER_QUOTE_INDEX_FILE, JSON.stringify(data));
+}
+let userQuoteIndices = loadUserQuoteIndices();
+
+const quotes = readLines(QUOTES_FILE);
+function getNextQuoteForUser(userId) {
+  const lastIndex = userQuoteIndices[userId] ?? -1;
+  const nextIndex = (lastIndex + 1) % quotes.length;
+  userQuoteIndices[userId] = nextIndex;
+  saveUserQuoteIndices(userQuoteIndices);
+  return quotes[nextIndex];
+}
+
+// === Dummy Articles (replace with news API later) ===
+const dummyArticles = [
+  "https://example.com/article1",
+  "https://example.com/article2",
+  "https://example.com/article3"
+];
+
+function getRandomArticle() {
+  const posted = new Set(readLines(POSTED_ARTICLES_FILE));
+  const available = dummyArticles.filter(url => !posted.has(url));
+  if (available.length === 0) return null;
+  const article = available[Math.floor(Math.random() * available.length)];
+  appendLine(POSTED_ARTICLES_FILE, article);
+  return article;
+}
+
+// === Telegram Bot ===
+const bot = new TelegramBot(TELEGRAM_API_TOKEN, {
+  polling: {
+    interval: 3000,
+    autoStart: true,
+    params: { timeout: 10 }
+  }
+});
+
+// === Greet New Users Once ===
+let greetedUsers = new Set(JSON.parse(fs.readFileSync(GREETED_USERS_FILE, "utf8") || "[]"));
+
+// === Handle /start Command ===
+bot.onText(/\/start/, (msg) => {
+  bot.sendMessage(msg.chat.id, `Hello! I'm Lucky, your English AI familiar of Lexmilian. I'm a bit shy, so please message only important stuff. If we chat too much, I'll pause until tomorrow.`);
+});
+
+// === Handle All Messages ===
+bot.on("message", async (msg) => {
+  const userId = msg.from.id;
+  const chatId = msg.chat.id;
+
+  // Save user if new
+  if (!users.has(userId)) {
+    users.add(userId);
+    saveUsers(users);
+  }
+
+  // Greet only once (non-command messages)
+  if (!greetedUsers.has(userId) && msg.text && !msg.text.startsWith("/")) {
+    const introMsg = `Hi! I'm Lucky, an English AI familiar of Lexmilian. I'm a bit shy, so please message only important stuff.`;
+    await bot.sendMessage(chatId, introMsg);
+    greetedUsers.add(userId);
+    fs.writeFileSync(GREETED_USERS_FILE, JSON.stringify([...greetedUsers]));
+  }
+
+  // Skip commands like /start
+  if (msg.text && msg.text.startsWith("/")) return;
+
+  // Send AI reply
+  const aiReply = await getAIReply(msg.text);
+  await bot.sendMessage(chatId, aiReply);
+});
+
+// === AI Chat Function ===
+async function getAIReply(userMessage) {
+  try {
+    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${OPENROUTER_API_KEY}`
+      },
+      body: JSON.stringify({
+        model: "gpt-4o-mini",
+        messages: [{ role: "user", content: userMessage }],
+        max_tokens: 200,
+        temperature: 0.7,
+      }),
+    });
+
+    const data = await response.json();
+    return data.choices?.[0]?.message?.content?.trim() || "Sorry, I couldn't think of a reply.";
+  } catch (e) {
+    console.error("AI error:", e.message);
+    return "Oops, I had a hiccup!";
+  }
+}
+
+// === Scheduled Quote + Article Posting ===
+const TARGET_CHAT_ID = 7588446899; // Replace with real group ID
+
+function postQuote(chatId) {
+  const quote = getRandomQuote();
+  if (quote) {
+    bot.sendMessage(chatId, `📜 Quote from Percarus:\n\n"${quote}"`);
+  }
+}
+function getRandomQuote() {
+  return quotes[Math.floor(Math.random() * quotes.length)];
+}
+function postArticle(chatId) {
+  const articleUrl = getRandomArticle();
+  if (articleUrl) {
+    const message = `📰 Here's a random article:\n${articleUrl}`;
+    bot.sendMessage(chatId, message);
+  }
+}
+
+// === Schedule for Group ===
+setInterval(() => postArticle(TARGET_CHAT_ID), 12 * 60 * 60 * 1000); // Every 12h
+setInterval(() => postQuote(TARGET_CHAT_ID), 6 * 60 * 60 * 1000);    // Every 6h
+
+// === Schedule Individual Quotes ===
+function sendDailyQuotesToUsers() {
+  users.forEach(async (userId) => {
+    const quote = getNextQuoteForUser(userId);
+    try {
+      await bot.sendMessage(userId, `📜 Daily quote:\n\n"${quote}"`);
+    } catch (e) {
+      console.error(`Error sending quote to ${userId}:`, e.message);
+    }
+  });
+}
+setInterval(sendDailyQuotesToUsers, 24 * 60 * 60 * 1000); // Every 24h
+sendDailyQuotesToUsers(); // Also on startup
+
+console.log("Lucky Puppy Bot is live with scheduled posts and AI replies!");

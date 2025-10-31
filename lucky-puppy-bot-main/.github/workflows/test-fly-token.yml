@@ -1,0 +1,19 @@
+name: Test Fly.io Token
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Fly.io Token
+        run: |
+          if [ -z "$FLY_API_TOKEN" ]; then
+            echo "❌ ERROR: FLY_API_TOKEN is not available in this workflow."
+            exit 1
+          else
+            echo "✅ Token length is ${#FLY_API_TOKEN}"
+          fi
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
